@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from "react";
-import { db, fmt, ago, Ava, Badge, Loading, Empty, CSS } from './saConfig';
+import { db, fmt, ago, Ava, Badge, Loading, Empty, CSS, initKorapayDeposit } from './saConfig';
 import { Splash, Auth, Dashboard, Challenges, MatchRoomCreate, MatchRoom, SubmitResult, Dispute } from './saScreens';
 
 function Leaderboard({ token, userId }) {
@@ -259,16 +259,19 @@ export default function StakeArena() {
     if (to === 'home') loadUserData(userId, token);
   };
 
-  const handleDeposit = async (amount) => {
-    setLoading(true);
-    try {
-      const newBal = (wallet?.balance || 0) + Number(amount);
-      await db.patch(`wallets?user_id=eq.${userId}`, token, { balance: newBal });
-      await db.post('transactions', token, { user_id: userId, type: 'deposit', amount: Number(amount), description: 'Wallet top-up' });
-      setWallet(prev => ({ ...prev, balance: newBal }));
-      showNotif(`${fmt(amount)} added! ✅`);
-    } catch (e) { showNotif('Deposit failed', 'err'); }
-    finally { setLoading(false); }
+  const handleDeposit = (amount) => {
+    initKorapayDeposit({
+      amount: Number(amount),
+      userId,
+      userEmail,
+      userName: profile?.username,
+      onSuccess: (newBalance, paidAmount) => {
+        setWallet(prev => ({ ...prev, balance: newBalance }));
+        showNotif(`${fmt(paidAmount)} added to wallet! ✅`);
+        loadUserData(userId, token);
+      },
+      onClose: () => showNotif('Payment cancelled', 'err')
+    });
   };
 
   const handleWithdraw = async (amount, bank, acct) => {
