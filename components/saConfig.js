@@ -158,3 +158,37 @@ export const CSS = `
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
   @keyframes dotBounce{0%,80%,100%{transform:scale(0);opacity:.5}40%{transform:scale(1);opacity:1}}
 `;
+
+// ─── KORAPAY PAYMENT ──────────────────────────────────────────────────────────
+export const initKorapayDeposit = ({ amount, userId, userEmail, userName, onSuccess, onClose }) => {
+  const reference = `SA_${userId.slice(0, 8)}_${Date.now()}`;
+
+  const script = document.createElement('script');
+  script.src = 'https://korablobstorage.blob.core.windows.net/modal-bucket/korapay-collections.min.js';
+  script.onload = () => {
+    window.Korapay.initialize({
+      key: process.env.NEXT_PUBLIC_KORAPAY_PUBLIC_KEY || '',
+      reference,
+      amount: Number(amount),
+      currency: 'NGN',
+      customer: {
+        name: userName || 'StakeArena User',
+        email: userEmail || 'user@stakearena.com'
+      },
+      notification_url: `${window.location.origin}/api/verify-payment`,
+      onSuccess: async (data) => {
+        try {
+          const res = await fetch('/api/verify-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reference: data.reference, userId, amount })
+          });
+          const result = await res.json();
+          if (result.success) onSuccess(result.newBalance, result.amount);
+        } catch (e) { console.error('Verification error:', e); }
+      },
+      onClose: () => { if (onClose) onClose(); }
+    });
+  };
+  document.body.appendChild(script);
+};
