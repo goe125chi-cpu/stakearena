@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from "react";
-import { db, fmt, gc, ago, Ava, Badge, Empty } from './saConfig';
+import { db, fmt, gc, ago, Ava, Badge, Empty, initKorapayDeposit } from './saConfig';
 
 export function Splash() {
   return (
