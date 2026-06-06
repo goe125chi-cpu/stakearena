@@ -209,7 +209,7 @@ export default function StakeArena() {
   const [activeNav, setActiveNav] = useState('home');
   const [notif, setNotif] = useState(null);
   const [loading, setLoading] = useState(false);
-  const isAdmin = userEmail?.includes('admin');
+  const isAdmin = profile?.is_admin === true;
   const showNotif = (msg, type = 'success') => { setNotif({ msg, type }); setTimeout(() => setNotif(null), 2800); };
 
   useEffect(() => {
