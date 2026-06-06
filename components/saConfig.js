@@ -167,7 +167,7 @@ export const initKorapayDeposit = ({ amount, userId, userEmail, userName, onSucc
   script.src = 'https://korablobstorage.blob.core.windows.net/modal-bucket/korapay-collections.min.js';
   script.onload = () => {
     window.Korapay.initialize({
-      key: process.env.NEXT_PUBLIC_KORAPAY_PUBLIC_KEY || '',
+      key: 'pk_test_kWKYH1tb9zgx1Aqnu58EDf7vpxhmdmFkrx8irNKJ',
       reference,
       amount: Number(amount),
       currency: 'NGN',
