@@ -332,6 +332,8 @@ export function MatchRoom({ token, userId, profile, activeMatch, setScreen, show
 
 export function SubmitResult({ token, userId, activeMatch, setScreen, showNotif, onSubmit }) {
   const [uploaded, setUploaded] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [screenshotUrl, setScreenshotUrl] = useState('');
   const [winner, setWinner] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const match = activeMatch || {};
@@ -340,12 +342,40 @@ export function SubmitResult({ token, userId, activeMatch, setScreen, showNotif,
   const oppId = isCreator ? match.opponent_id : match.creator_id;
   const myName = match.creator_username || 'You';
   const oppName = match.opponent_username || 'Opponent';
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('matchId', match.id || 'unknown');
+      form.append('userId', userId);
+      const res = await fetch('/api/upload-screenshot', { method: 'POST', body: form });
+      const data = await res.json();
+      if (data.success) {
+        setScreenshotUrl(data.url);
+        setUploaded(true);
+        showNotif('Screenshot uploaded! ✅');
+      } else {
+        showNotif('Upload failed. Try again.', 'err');
+      }
+    } catch (e) {
+      showNotif('Upload failed. Try again.', 'err');
+    } finally { setUploading(false); }
+  };
+
   const submit = async () => {
     if (!uploaded) { showNotif('Upload screenshot first', 'err'); return; }
     if (!winner) { showNotif('Select who won', 'err'); return; }
     setSubmitting(true);
     try {
       const winnerId = winner === 'me' ? myId : oppId;
+      // Save screenshot URL to challenge
+      if (screenshotUrl) {
+        await db.patch(`challenges?id=eq.${match.id}`, token, { screenshot_url: screenshotUrl });
+      }
       const res = await db.rpc('claim_win', token, { p_challenge_id: match.id, p_winner_id: winnerId });
       if (res?.error) showNotif('Submit failed. Admin will review.', 'err');
       else showNotif(winner === 'me' ? `🏆 You won ${fmt(res.payout)}!` : 'Result submitted.');
@@ -361,10 +391,16 @@ export function SubmitResult({ token, userId, activeMatch, setScreen, showNotif,
         <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 17, fontWeight: 700, marginBottom: 4 }}>Room Code</div>
         <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 22, color: '#00ff88', letterSpacing: 4 }}>{match.room_code || 'N/A'}</div>
       </div>
-      <div className={`upload-zone ${uploaded ? 'done' : ''}`} onClick={() => { setUploaded(true); showNotif('Screenshot attached!'); }}>
-        <div className="upload-ico">{uploaded ? '✅' : '📸'}</div>
-        <div className="upload-text">{uploaded ? 'Screenshot attached' : 'Tap to attach final score screenshot'}</div>
-      </div>
+      <label style={{ display: 'block', cursor: 'pointer' }}>
+        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileUpload} />
+        <div className={`upload-zone ${uploaded ? 'done' : ''}`}>
+          <div className="upload-ico">{uploading ? '⏳' : uploaded ? '✅' : '📸'}</div>
+          <div className="upload-text">
+            {uploading ? 'Uploading...' : uploaded ? 'Screenshot uploaded successfully' : 'Tap to upload final score screenshot'}
+          </div>
+          {screenshotUrl && <img src={screenshotUrl} alt="Screenshot" style={{ width: '100%', borderRadius: 8, marginTop: 10, maxHeight: 200, objectFit: 'cover' }} />}
+        </div>
+      </label>
       <div className="pg-sub">Who Won?</div>
       <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
         {[{ id: 'me', label: `${myName} (Me)` }, { id: 'opp', label: oppName }].map(p => (
