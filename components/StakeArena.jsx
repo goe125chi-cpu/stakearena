@@ -177,18 +177,36 @@ function Admin({ token, showNotif }) {
       )}
       {tab === 'withdrawals' && (withdrawals.length === 0 ? <Empty msg="✅ No pending withdrawals" /> :
         withdrawals.map(wd => (
-          <div key={wd.id} className="card">
+          <div key={wd.id} className="card" style={{ background: 'rgba(255,215,0,0.04)', borderColor: 'rgba(255,215,0,0.15)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
               <Ava s={wd.profiles?.username || '?'} />
-              <div>
-                <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 17, fontWeight: 700 }}>{wd.profiles?.username}</div>
-                <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{wd.bank_name} · {wd.account_number}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 18, fontWeight: 700 }}>{wd.profiles?.username}</div>
+                <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{ago(wd.created_at)}</div>
               </div>
-              <div style={{ marginLeft: 'auto', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 22, fontWeight: 800, color: '#ffd700' }}>{fmt(wd.amount)}</div>
+              <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 24, fontWeight: 800, color: '#ffd700' }}>{fmt(wd.amount)}</div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
+              <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 8, letterSpacing: 1 }}>PAYMENT DETAILS — SEND VIA KORAPAY</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Bank</span>
+                <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 16, fontWeight: 700 }}>{wd.bank_name}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Account No.</span>
+                <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 15, color: '#00ff88', fontWeight: 600 }}>{wd.account_number}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Amount to Send</span>
+                <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 16, fontWeight: 800, color: '#ffd700' }}>{fmt(wd.amount)}</span>
+              </div>
+            </div>
+            <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: 'rgba(255,165,0,0.7)', marginBottom: 12 }}>
+              ⚠️ Send payment via Korapay dashboard first, then tap Approve
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn-g" style={{ flex: 1 }} onClick={() => approveWd(wd)}>Approve</button>
-              <button className="btn-r" style={{ flex: 1 }} onClick={() => rejectWd(wd)}>Reject & Refund</button>
+              <button className="btn-g" style={{ flex: 1 }} onClick={() => approveWd(wd)}>✅ Sent — Approve</button>
+              <button className="btn-r" style={{ flex: 1 }} onClick={() => rejectWd(wd)}>❌ Reject & Refund</button>
             </div>
           </div>
         ))
