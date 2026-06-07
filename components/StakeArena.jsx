@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { db, fmt, ago, Ava, Badge, Loading, Empty, CSS, initKorapayDeposit } from './saConfig';
 import { Splash, Auth, Dashboard, Challenges, MatchRoomCreate, MatchRoom, SubmitResult, Dispute } from './saScreens';
+import { ReferralScreen } from './saReferral';
 
 function Leaderboard({ token, userId }) {
   const [board, setBoard] = useState([]);
@@ -262,6 +263,21 @@ export default function StakeArena() {
       const tok = data.access_token;
       const uid = data.user?.id;
       const em = data.user?.email;
+      // Handle referral code from URL
+      if (isSignUp) {
+        try {
+          const urlRef = new URLSearchParams(window.location.search).get('ref');
+          if (urlRef) {
+            const refProfiles = await db.get(`profiles?referral_code=eq.${urlRef}&select=id`, tok);
+            if (refProfiles[0]) {
+              await db.patch(`profiles?id=eq.${uid}`, tok, { referred_by: refProfiles[0].id });
+              await fetch('/api/v1/rest', { method: 'POST' }).catch(() => {});
+              // Insert referral record
+              await db.post('referrals', tok, { referrer_id: refProfiles[0].id, referred_id: uid });
+            }
+          }
+        } catch (e) { console.error('Referral setup error:', e); }
+      }
       if (typeof window !== 'undefined') localStorage.setItem('sa_session', JSON.stringify({ token: tok, userId: uid, email: em }));
       setToken(tok); setUserId(uid); setUserEmail(em);
       await loadUserData(uid, tok);
@@ -325,6 +341,7 @@ export default function StakeArena() {
     { id: 'challenges', icon: '⚔️', label: 'Challenges' },
     { id: 'leaderboard', icon: '🏆', label: 'Rankings' },
     { id: 'wallet', icon: '💳', label: 'Wallet' },
+    { id: 'referral', icon: '👥', label: 'Refer' },
     ...(isAdmin ? [{ id: 'admin', icon: '🛡️', label: 'Admin' }] : []),
   ];
 
@@ -344,6 +361,7 @@ export default function StakeArena() {
       case 'dispute': return <Dispute {...shared} />;
       case 'leaderboard': return <Leaderboard token={token} userId={userId} />;
       case 'wallet': return <Wallet {...shared} onDeposit={handleDeposit} onWithdraw={handleWithdraw} />;
+      case 'referral': return <ReferralScreen token={token} userId={userId} profile={profile} wallet={wallet} showNotif={showNotif} />;
       case 'admin': return <Admin token={token} showNotif={showNotif} />;
       default: return <Dashboard {...shared} onNav={nav} />;
     }
