@@ -31,6 +31,9 @@ export function Auth({ onAuth, loading }) {
           <div className="field">
             <label className="flabel">Game Tag / Username</label>
             <input className="finput" placeholder="e.g. GoalKing_NG" value={f.username} onChange={set('username')} />
+            <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: 'rgba(255,165,0,0.8)', marginTop: 6, lineHeight: 1.6 }}>
+              ⚠️ Use your exact eFootball username so opponents can find you in-game
+            </div>
           </div>
         )}
         <div className="field">
@@ -301,28 +304,27 @@ export function MatchRoom({ token, userId, profile, activeMatch, setScreen, show
           <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>OPP</div>
         </div>
       </div>
-      <div className="score-box">
-        <div className="score-side">
-          <div className="score-num" style={{ color: myScore > oppScore ? '#00ff88' : '#fff' }}>{myScore}</div>
-          <div className="score-ctrl">
-            <button className="sc-btn sc-plus" onClick={() => updateScore('me', 1)} disabled={ended}>+</button>
-            <button className="sc-btn sc-minus" onClick={() => updateScore('me', -1)} disabled={ended}>−</button>
-          </div>
+      <div className="card" style={{ background: 'rgba(0,255,136,0.04)', borderColor: 'rgba(0,255,136,0.15)', textAlign: 'center', padding: 28 }}>
+        <div style={{ fontSize: 48, marginBottom: 12 }}>⚽</div>
+        <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Match In Progress</div>
+        <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: 1.9 }}>
+          🎮 Focus on your game<br />
+          📸 Take a screenshot when the match ends<br />
+          ⚠️ Do NOT update live score to avoid disconnection
         </div>
-        <div className="score-divider" />
-        <div className="score-side">
-          <div className="score-num" style={{ color: oppScore > myScore ? '#ff2d55' : '#fff' }}>{oppScore}</div>
-          <div className="score-ctrl">
-            <button className="sc-btn sc-plus" onClick={() => updateScore('opp', 1)} disabled={ended}>+</button>
-            <button className="sc-btn sc-minus" onClick={() => updateScore('opp', -1)} disabled={ended}>−</button>
-          </div>
+      </div>
+      <div className="card" style={{ background: 'rgba(255,165,0,0.05)', borderColor: 'rgba(255,165,0,0.2)' }}>
+        <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: 'rgba(255,165,0,0.8)', lineHeight: 1.8 }}>
+          ⚡ Stake: {fmt(match.stake_amount)} · Win: {fmt((match.stake_amount || 0) * 1.9)}<br />
+          🤝 Draw = full refund to both players<br />
+          🏆 Winner takes 1.9x stake
         </div>
       </div>
       {!ended ? (
-        <button className="btn-p" style={{ background: 'linear-gradient(135deg,#ff6b35,#ff2d55)', color: '#fff' }} onClick={() => setEnded(true)}>🏁 End Match</button>
+        <button className="btn-p" style={{ background: 'linear-gradient(135deg,#ff6b35,#ff2d55)', color: '#fff' }} onClick={() => setEnded(true)}>🏁 Match Ended — Submit Result</button>
       ) : (
         <>
-          <button className="btn-p" onClick={() => setScreen('submit-result')}>📸 Submit Screenshot Result</button>
+          <button className="btn-p" onClick={() => setScreen('submit-result')}>📸 Upload Screenshot & Submit</button>
           <button className="btn-r" style={{ width: '100%', marginTop: 8 }} onClick={() => setScreen('dispute')}>⚠️ Raise Dispute</button>
         </>
       )}
@@ -401,16 +403,28 @@ export function SubmitResult({ token, userId, activeMatch, setScreen, showNotif,
           {screenshotUrl && <img src={screenshotUrl} alt="Screenshot" style={{ width: '100%', borderRadius: 8, marginTop: 10, maxHeight: 200, objectFit: 'cover' }} />}
         </div>
       </label>
-      <div className="pg-sub">Who Won?</div>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-        {[{ id: 'me', label: `${myName} (Me)` }, { id: 'opp', label: oppName }].map(p => (
+      <div className="pg-sub">Match Result</div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {[
+          { id: 'me', label: `🏆 I Won`, color: 'rgba(0,255,136,0.4)', bg: 'rgba(0,255,136,0.08)' },
+          { id: 'draw', label: `🤝 Draw`, color: 'rgba(255,165,0,0.4)', bg: 'rgba(255,165,0,0.08)' },
+          { id: 'opp', label: `💔 I Lost`, color: 'rgba(255,45,85,0.4)', bg: 'rgba(255,45,85,0.08)' },
+        ].map(p => (
           <button key={p.id} className="card"
-            style={{ flex: 1, cursor: 'pointer', textAlign: 'center', borderColor: winner === p.id ? 'rgba(0,255,136,0.4)' : 'rgba(255,255,255,0.07)', background: winner === p.id ? 'rgba(0,255,136,0.08)' : 'rgba(255,255,255,0.04)' }}
+            style={{ flex: 1, cursor: 'pointer', textAlign: 'center', borderColor: winner === p.id ? p.color : 'rgba(255,255,255,0.07)', background: winner === p.id ? p.bg : 'rgba(255,255,255,0.04)', padding: '14px 8px' }}
             onClick={() => setWinner(p.id)}>
-            <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 15, fontWeight: 700 }}>{p.label}</div>
+            <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 14, fontWeight: 700 }}>{p.label}</div>
           </button>
         ))}
       </div>
+      {winner === 'draw' && (
+        <div className="card" style={{ background: 'rgba(255,165,0,0.06)', borderColor: 'rgba(255,165,0,0.2)', marginBottom: 14 }}>
+          <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: 'rgba(255,165,0,0.8)', lineHeight: 1.8 }}>
+            🤝 Draw selected — both players will receive a full refund.<br />
+            No commission deducted on draws.
+          </div>
+        </div>
+      )}
       <button className="btn-p" disabled={submitting} onClick={submit}>{submitting ? 'Submitting...' : 'Submit Result'}</button>
     </div>
   );
