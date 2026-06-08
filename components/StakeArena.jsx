@@ -116,17 +116,20 @@ function Admin({ token, showNotif }) {
   const [disputes, setDisputes] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
   const [stats, setStats] = useState({ vol: 0, matches: 0 });
+  const [recentMatches, setRecentMatches] = useState([]);
   useEffect(() => { loadData(); }, []);
   const loadData = async () => {
     try {
-      const [d, w, ch] = await Promise.all([
-        db.get('disputes?status=eq.pending&select=*,profiles!disputes_raised_by_fkey(username),challenges(id,stake_amount,room_code,creator_id,opponent_id,profiles!challenges_creator_id_fkey(username))&order=created_at.desc', token),
+      const [d, w, ch, pending] = await Promise.all([
+        db.get('disputes?status=eq.pending&select=*,profiles!disputes_raised_by_fkey(username),challenges(id,stake_amount,room_code,creator_id,opponent_id,screenshot_url,profiles!challenges_creator_id_fkey(username))&order=created_at.desc', token),
         db.get('withdrawal_requests?status=eq.pending&select=*,profiles(username)&order=created_at.desc', token),
-        db.get('challenges?select=stake_amount', token),
+        db.get('challenges?select=stake_amount,status', token),
+        db.get('challenges?status=eq.completed&select=id,stake_amount,room_code,screenshot_url,creator_id,opponent_id,winner_id,updated_at,profiles!challenges_creator_id_fkey(username)&order=updated_at.desc&limit=10', token),
       ]);
       if (Array.isArray(d)) setDisputes(d);
       if (Array.isArray(w)) setWithdrawals(w);
       if (Array.isArray(ch)) setStats({ vol: ch.reduce((s, c) => s + (c.stake_amount || 0) * 2, 0), matches: ch.length });
+      if (Array.isArray(pending)) setRecentMatches(pending);
     } catch (e) {}
   };
   const resolveDispute = async (d, winnerId, winnerName) => {
@@ -160,7 +163,8 @@ function Admin({ token, showNotif }) {
       </div>
       <div className="tabs" style={{ marginBottom: 20 }}>
         <button className={`tab ${tab === 'disputes' ? 'on' : ''}`} onClick={() => setTab('disputes')}>Disputes ({disputes.length})</button>
-        <button className={`tab ${tab === 'withdrawals' ? 'on' : ''}`} onClick={() => setTab('withdrawals')}>Withdrawals ({withdrawals.length})</button>
+        <button className={`tab ${tab === 'withdrawals' ? 'on' : ''}`} onClick={() => setTab('withdrawals')}>Withdrawals</button>
+        <button className={`tab ${tab === 'results' ? 'on' : ''}`} onClick={() => setTab('results')}>Results</button>
       </div>
       {tab === 'disputes' && (disputes.length === 0 ? <Empty msg="✅ No pending disputes" /> :
         disputes.map(d => {
@@ -176,6 +180,38 @@ function Admin({ token, showNotif }) {
             </div>
           );
         })
+      )}
+      {tab === 'results' && (
+        recentMatches.length === 0 ? <Empty msg="No completed matches yet" /> :
+          recentMatches.map(m => (
+            <div key={m.id} className="card" style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div>
+                  <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 17, fontWeight: 700 }}>
+                    {m.profiles?.username || 'Player 1'} vs Opponent
+                  </div>
+                  <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
+                    Room: {m.room_code} · {ago(m.updated_at)}
+                  </div>
+                </div>
+                <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 18, fontWeight: 800, color: '#ffd700' }}>
+                  {fmt(m.stake_amount)}
+                </div>
+              </div>
+              {m.screenshot_url ? (
+                <div>
+                  <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 6 }}>SUBMITTED SCREENSHOT</div>
+                  <img src={m.screenshot_url} alt="Match screenshot"
+                    style={{ width: '100%', borderRadius: 10, maxHeight: 220, objectFit: 'cover', border: '1px solid rgba(0,255,136,0.2)' }}
+                    onClick={() => window.open(m.screenshot_url, '_blank')}
+                  />
+                  <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 9, color: 'rgba(0,255,136,0.5)', marginTop: 4 }}>tap to view full size</div>
+                </div>
+              ) : (
+                <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>No screenshot submitted</div>
+              )}
+            </div>
+          ))
       )}
       {tab === 'withdrawals' && (withdrawals.length === 0 ? <Empty msg="✅ No pending withdrawals" /> :
         withdrawals.map(wd => (
