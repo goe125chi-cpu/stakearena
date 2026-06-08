@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { db, fmt, ago, Ava, Badge, Loading, Empty, CSS, initKorapayDeposit } from './saConfig';
 import { Splash, Auth, Dashboard, Challenges, MatchRoomCreate, MatchRoom, SubmitResult, Dispute } from './saScreens';
 import { ReferralScreen } from './saReferral';
+import OneSignalInit, { sendNotification } from './OneSignalInit';
 
 function Leaderboard({ token, userId }) {
   const [board, setBoard] = useState([]);
@@ -332,6 +333,10 @@ export default function StakeArena() {
       await db.post('transactions', token, { user_id: userId, type: 'stake', amount: -ch.stake_amount, description: `Joined challenge · Room ${ch.room_code}` });
       setWallet(prev => ({ ...prev, balance: newBal }));
       setActiveMatch({ ...ch, opponent_id: userId });
+      // Notify challenge creator
+      try {
+        await sendNotification([ch.creator_id], '⚔️ Challenge Accepted!', `${profile?.username} joined your challenge! Time to play. Stake: ${fmt(ch.stake_amount)}`, 'https://stakearena-sepia.vercel.app');
+      } catch(e) {}
     } catch (e) { showNotif('Failed to join', 'err'); }
     finally { setLoading(false); }
   };
@@ -373,6 +378,7 @@ export default function StakeArena() {
       <div className="sa">
         <div className="sa-grid" />
         <div className="z">
+          <OneSignalInit userId={userId} />
           {loading && <Loading />}
           {notif && <div className={`notif ${notif.type === 'err' ? 'err' : ''}`}>{notif.msg}</div>}
           {showNav && (
