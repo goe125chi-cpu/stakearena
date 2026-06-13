@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from "react";
-import { db, fmt, ago, Ava, Badge, Loading, Empty, CSS, initKorapayDeposit } from './saConfig';
+import { db, fmt, ago, Ava, Badge, Loading, Empty, CSS, initKorapayDeposit, isOnline } from './saConfig';
 import { Splash, Auth, Dashboard, Challenges, MatchRoomCreate, MatchRoom, SubmitResult, Dispute } from './saScreens';
 import { ReferralScreen } from './saReferral';
 import OneSignalInit, { sendNotification } from './OneSignalInit';
@@ -20,7 +20,7 @@ function Leaderboard({ token, userId }) {
   const [board, setBoard] = useState([]);
   const [myRank, setMyRank] = useState(null);
   useEffect(() => {
-    db.get('profiles?select=id,username,wins,losses,total_earned&order=wins.desc&limit=10', token)
+    db.get('profiles?select=id,username,wins,losses,total_earned,last_seen&order=wins.desc&limit=10', token)
       .then(data => { if (Array.isArray(data)) { setBoard(data); const i = data.findIndex(p => p.id === userId); if (i >= 0) setMyRank(i + 1); } }).catch(() => {});
   }, []);
   const medals = ['🥇', '🥈', '🥉'];
@@ -39,7 +39,7 @@ function Leaderboard({ token, userId }) {
           return (
             <div key={p.id} className={`lb-row ${p.id === userId ? 'me' : ''}`}>
               <div className="lb-rank" style={{ color: i < 3 ? ['#ffd700', '#c0c0c0', '#cd7f32'][i] : 'rgba(255,255,255,0.3)' }}>{i < 3 ? medals[i] : `#${i + 1}`}</div>
-              <Ava s={p.username} color={p.id === userId ? undefined : 'linear-gradient(135deg,#333,#555)'} />
+              <Ava s={p.username} color={p.id === userId ? undefined : 'linear-gradient(135deg,#333,#555)'} online={isOnline(p.last_seen)} />
               <div style={{ flex: 1 }}>
                 <div className="lb-name">{p.username}{p.id === userId ? ' (You)' : ''}</div>
                 <div className="lb-rec">{p.wins}W · {p.losses}L · {wr}% WR</div>
@@ -53,11 +53,10 @@ function Leaderboard({ token, userId }) {
   );
 }
 
-const BANK_DETAILS = {
-  bankName: 'Opay',
-  accountNumber: '6112501274',
-  accountName: 'Joseph Chibunna Amadi'
-};
+const BANK_ACCOUNTS = [
+  { bankName: 'Opay', accountNumber: '6112501274', accountName: 'Joseph Chibunna Amadi' },
+  { bankName: 'Moniepoint MFB', accountNumber: '9115910830', accountName: 'Joseph Chibunna Amadi' },
+];
 
 function Wallet({ token, userId, wallet, onDeposit, onWithdraw }) {
   const [tab, setTab] = useState('history');
@@ -93,21 +92,23 @@ function Wallet({ token, userId, wallet, onDeposit, onWithdraw }) {
             <input className="finput" type="number" placeholder="Enter amount (₦)" value={depAmt} onChange={e => setDepAmt(e.target.value)} />
           </div>
 
-          <div className="card" style={{ background: 'rgba(0,255,136,0.06)', borderColor: 'rgba(0,255,136,0.2)' }}>
-            <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 17, fontWeight: 700, marginBottom: 10 }}>🏦 Bank Transfer Details</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Bank Name</span>
-              <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 16, fontWeight: 700 }}>{BANK_DETAILS.bankName}</span>
+          <div className="pg-sub" style={{ marginTop: 4 }}>🏦 Choose a Bank to Transfer To</div>
+          {BANK_ACCOUNTS.map((acc, i) => (
+            <div key={i} className="card" style={{ background: 'rgba(0,255,136,0.06)', borderColor: 'rgba(0,255,136,0.2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Bank Name</span>
+                <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 16, fontWeight: 700 }}>{acc.bankName}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Account Number</span>
+                <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 16, color: '#00ff88', fontWeight: 600 }}>{acc.accountNumber}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Account Name</span>
+                <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 15, fontWeight: 700 }}>{acc.accountName}</span>
+              </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Account Number</span>
-              <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 16, color: '#00ff88', fontWeight: 600 }}>{BANK_DETAILS.accountNumber}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Account Name</span>
-              <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 15, fontWeight: 700 }}>{BANK_DETAILS.accountName}</span>
-            </div>
-          </div>
+          ))}
 
           <div className="card" style={{ background: 'rgba(255,165,0,0.04)', borderColor: 'rgba(255,165,0,0.15)' }}>
             <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: 'rgba(255,165,0,0.8)', lineHeight: 1.9 }}>
@@ -403,6 +404,17 @@ export default function StakeArena() {
     } catch (e) { console.error(e); }
   }, []);
 
+  // Presence heartbeat - update last_seen every 30s while app is open
+  useEffect(() => {
+    if (!token || !userId) return;
+    const updatePresence = () => {
+      db.patch(`profiles?id=eq.${userId}`, token, { last_seen: new Date().toISOString() }).catch(() => {});
+    };
+    updatePresence();
+    const interval = setInterval(updatePresence, 30000);
+    return () => clearInterval(interval);
+  }, [token, userId]);
+
   const handleAuth = async (email, password, username, isSignUp) => {
     setLoading(true);
     try {
@@ -546,7 +558,7 @@ export default function StakeArena() {
               <div className="hdr-logo">StakeArena</div>
               <div className="hdr-right">
                 <div className="hdr-badge">{fmt(wallet?.balance)}</div>
-                <Ava s={profile?.username || '?'} />
+                <Ava s={profile?.username || '?'} online={true} />
               </div>
             </div>
           )}
