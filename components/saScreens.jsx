@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from "react";
-import { db, fmt, gc, ago, Ava, Badge, Empty, initKorapayDeposit } from './saConfig';
+import { db, fmt, gc, ago, Ava, Badge, Empty, initKorapayDeposit, isOnline } from './saConfig';
 
 export function Splash() {
   return (
@@ -134,7 +134,7 @@ export function Challenges({ token, userId, wallet, profile, setScreen, setActiv
   const loadC = async () => {
     setLoadingC(true);
     try {
-      const data = await db.get(`challenges?status=eq.open&select=id,stake_amount,room_code,created_at,creator_id,profiles!challenges_creator_id_fkey(username)&order=created_at.desc`, token);
+      const data = await db.get(`challenges?status=eq.open&select=id,stake_amount,room_code,created_at,creator_id,profiles!challenges_creator_id_fkey(username,last_seen)&order=created_at.desc`, token);
       setChallenges(Array.isArray(data) ? data.filter(c => c.creator_id !== userId) : []);
     } catch (e) { showNotif('Failed to load', 'err'); }
     finally { setLoadingC(false); }
@@ -174,7 +174,7 @@ export function Challenges({ token, userId, wallet, profile, setScreen, setActiv
           {loadingC ? <Empty msg="Loading..." /> : challenges.length === 0 ? <Empty msg="No open challenges yet!" /> :
             challenges.map(ch => (
               <div key={ch.id} className="ch-row">
-                <Ava s={ch.profiles?.username || '?'} />
+                <Ava s={ch.profiles?.username || '?'} online={isOnline(ch.profiles?.last_seen)} />
                 <div className="ch-info">
                   <div className="ch-name">{ch.profiles?.username || 'Unknown'}</div>
                   <div className="ch-meta">1v1 · {ago(ch.created_at)}</div>
