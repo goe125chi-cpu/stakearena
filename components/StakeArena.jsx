@@ -53,10 +53,17 @@ function Leaderboard({ token, userId }) {
   );
 }
 
+const BANK_DETAILS = {
+  bankName: 'Opay',
+  accountNumber: '6112501274',
+  accountName: 'Joseph Chibunna Amadi'
+};
+
 function Wallet({ token, userId, wallet, onDeposit, onWithdraw }) {
   const [tab, setTab] = useState('history');
   const [txs, setTxs] = useState([]);
   const [depAmt, setDepAmt] = useState('');
+  const [depRef, setDepRef] = useState('');
   const [witAmt, setWitAmt] = useState('');
   const [bank, setBank] = useState('GTBank');
   const [acct, setAcct] = useState('');
@@ -85,12 +92,39 @@ function Wallet({ token, userId, wallet, onDeposit, onWithdraw }) {
             <label className="flabel">Custom Amount</label>
             <input className="finput" type="number" placeholder="Enter amount (₦)" value={depAmt} onChange={e => setDepAmt(e.target.value)} />
           </div>
-          <div className="card" style={{ background: 'rgba(0,255,136,0.04)', borderColor: 'rgba(0,255,136,0.1)' }}>
-            <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.8 }}>
-              💡 Demo mode: funds added instantly<br />🔜 Paystack integration coming next
+
+          <div className="card" style={{ background: 'rgba(0,255,136,0.06)', borderColor: 'rgba(0,255,136,0.2)' }}>
+            <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 17, fontWeight: 700, marginBottom: 10 }}>🏦 Bank Transfer Details</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Bank Name</span>
+              <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 16, fontWeight: 700 }}>{BANK_DETAILS.bankName}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Account Number</span>
+              <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 16, color: '#00ff88', fontWeight: 600 }}>{BANK_DETAILS.accountNumber}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Account Name</span>
+              <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 15, fontWeight: 700 }}>{BANK_DETAILS.accountName}</span>
             </div>
           </div>
-          <button className="btn-p" disabled={!depAmt} onClick={() => onDeposit(depAmt)}>Deposit {depAmt ? fmt(depAmt) : ''}</button>
+
+          <div className="card" style={{ background: 'rgba(255,165,0,0.04)', borderColor: 'rgba(255,165,0,0.15)' }}>
+            <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: 'rgba(255,165,0,0.8)', lineHeight: 1.9 }}>
+              1️⃣ Transfer the exact amount above to this account<br />
+              2️⃣ Enter the transaction reference / sender name below<br />
+              3️⃣ Tap submit — admin will verify and credit your wallet within minutes
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="flabel">Transaction Reference / Sender Name</label>
+            <input className="finput" type="text" placeholder="e.g. TRF/240601/ABC123 or your name" value={depRef} onChange={e => setDepRef(e.target.value)} />
+          </div>
+
+          <button className="btn-p" disabled={!depAmt || !depRef} onClick={() => onDeposit(depAmt, depRef)}>
+            ✅ I've Made the Transfer — Submit
+          </button>
         </>
       )}
       {tab === 'withdraw' && (
@@ -126,21 +160,24 @@ function Admin({ token, showNotif }) {
   const [tab, setTab] = useState('disputes');
   const [disputes, setDisputes] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
+  const [deposits, setDeposits] = useState([]);
   const [stats, setStats] = useState({ vol: 0, matches: 0 });
   const [recentMatches, setRecentMatches] = useState([]);
   useEffect(() => { loadData(); }, []);
   const loadData = async () => {
     try {
-      const [d, w, ch, pending] = await Promise.all([
+      const [d, w, ch, pending, dep] = await Promise.all([
         db.get('disputes?status=eq.pending&select=*,profiles!disputes_raised_by_fkey(username),challenges(id,stake_amount,room_code,creator_id,opponent_id,screenshot_url,profiles!challenges_creator_id_fkey(username))&order=created_at.desc', token),
         db.get('withdrawal_requests?status=eq.pending&select=*,profiles(username)&order=created_at.desc', token),
         db.get('challenges?select=stake_amount,status', token),
         db.get('challenges?status=eq.completed&select=id,stake_amount,room_code,screenshot_url,creator_id,opponent_id,winner_id,updated_at,profiles!challenges_creator_id_fkey(username)&order=updated_at.desc&limit=10', token),
+        db.get('deposit_requests?status=eq.pending&select=*,profiles(username)&order=created_at.desc', token),
       ]);
       if (Array.isArray(d)) setDisputes(d);
       if (Array.isArray(w)) setWithdrawals(w);
       if (Array.isArray(ch)) setStats({ vol: ch.reduce((s, c) => s + (c.stake_amount || 0) * 2, 0), matches: ch.length });
       if (Array.isArray(pending)) setRecentMatches(pending);
+      if (Array.isArray(dep)) setDeposits(dep);
     } catch (e) {}
   };
   const resolveDispute = async (d, winnerId, winnerName) => {
@@ -149,6 +186,30 @@ function Admin({ token, showNotif }) {
       setDisputes(prev => prev.filter(x => x.id !== d.id)); showNotif(`Resolved → ${winnerName} wins 🏆`);
     } catch (e) { showNotif('Failed', 'err'); }
   };
+  const approveDeposit = async (dep) => {
+    try {
+      const w = await db.get(`wallets?user_id=eq.${dep.user_id}&select=balance`, token);
+      const newBal = (w[0]?.balance || 0) + Number(dep.amount);
+      await db.patch(`wallets?user_id=eq.${dep.user_id}`, token, { balance: newBal });
+      await db.post('transactions', token, { user_id: dep.user_id, type: 'deposit', amount: Number(dep.amount), description: `Wallet top-up · Bank transfer · Ref: ${dep.reference}` });
+      await db.patch(`deposit_requests?id=eq.${dep.id}`, token, { status: 'approved' });
+      // Pay referral commission
+      try {
+        await fetch('/api/pay-referral', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: dep.user_id, amount: Number(dep.amount) }) });
+      } catch(e) {}
+      setDeposits(prev => prev.filter(x => x.id !== dep.id));
+      showNotif(`✅ ${fmt(dep.amount)} credited to ${dep.profiles?.username}!`);
+    } catch (e) { showNotif('Failed', 'err'); }
+  };
+
+  const rejectDeposit = async (dep) => {
+    try {
+      await db.patch(`deposit_requests?id=eq.${dep.id}`, token, { status: 'rejected' });
+      setDeposits(prev => prev.filter(x => x.id !== dep.id));
+      showNotif('Deposit rejected');
+    } catch (e) { showNotif('Failed', 'err'); }
+  };
+
   const approveWd = async (wd) => {
     try {
       await db.patch(`withdrawal_requests?id=eq.${wd.id}`, token, { status: 'approved' });
@@ -183,10 +244,39 @@ function Admin({ token, showNotif }) {
         <div className="stat"><div className="stat-val red">{disputes.length}</div><div className="stat-lbl">Disputes</div></div>
       </div>
       <div className="tabs" style={{ marginBottom: 20 }}>
+        <button className={`tab ${tab === 'deposits' ? 'on' : ''}`} onClick={() => setTab('deposits')}>Deposits ({deposits.length})</button>
         <button className={`tab ${tab === 'disputes' ? 'on' : ''}`} onClick={() => setTab('disputes')}>Disputes ({disputes.length})</button>
         <button className={`tab ${tab === 'withdrawals' ? 'on' : ''}`} onClick={() => setTab('withdrawals')}>Withdrawals</button>
+      </div>
+      <div className="tabs" style={{ marginBottom: 20 }}>
         <button className={`tab ${tab === 'results' ? 'on' : ''}`} onClick={() => setTab('results')}>Results</button>
       </div>
+      {tab === 'deposits' && (
+        deposits.length === 0 ? <Empty msg="✅ No pending deposits" /> :
+          deposits.map(dep => (
+            <div key={dep.id} className="card" style={{ background: 'rgba(0,255,136,0.04)', borderColor: 'rgba(0,255,136,0.15)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <Ava s={dep.profiles?.username || '?'} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 18, fontWeight: 700 }}>{dep.profiles?.username}</div>
+                  <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{ago(dep.created_at)}</div>
+                </div>
+                <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 24, fontWeight: 800, color: '#ffd700' }}>{fmt(dep.amount)}</div>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
+                <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 6, letterSpacing: 1 }}>REFERENCE / SENDER</div>
+                <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 14, color: '#00ff88' }}>{dep.reference || 'No reference provided'}</div>
+              </div>
+              <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: 'rgba(255,165,0,0.7)', marginBottom: 12 }}>
+                ⚠️ Verify ₦{Number(dep.amount).toLocaleString()} was received in Opay (6112501274) before approving
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn-g" style={{ flex: 1 }} onClick={() => approveDeposit(dep)}>✅ Verified — Credit Wallet</button>
+                <button className="btn-r" style={{ flex: 1 }} onClick={() => rejectDeposit(dep)}>❌ Reject</button>
+              </div>
+            </div>
+          ))
+      )}
       {tab === 'disputes' && (disputes.length === 0 ? <Empty msg="✅ No pending disputes" /> :
         disputes.map(d => {
           const ch = d.challenges || {};
@@ -355,19 +445,18 @@ export default function StakeArena() {
     if (to === 'home') loadUserData(userId, token);
   };
 
-  const handleDeposit = (amount) => {
-    initKorapayDeposit({
-      amount: Number(amount),
-      userId,
-      userEmail,
-      userName: profile?.username,
-      onSuccess: (newBalance, paidAmount) => {
-        setWallet(prev => ({ ...prev, balance: newBalance }));
-        showNotif(`${fmt(paidAmount)} added to wallet! ✅`);
-        loadUserData(userId, token);
-      },
-      onClose: () => showNotif('Payment cancelled', 'err')
-    });
+  const handleDeposit = async (amount, reference) => {
+    setLoading(true);
+    try {
+      await db.post('deposit_requests', token, {
+        user_id: userId,
+        amount: Number(amount),
+        reference: reference || '',
+        status: 'pending'
+      });
+      showNotif('Deposit submitted! Admin will verify shortly. ⏳');
+    } catch (e) { showNotif('Failed to submit. Try again.', 'err'); }
+    finally { setLoading(false); }
   };
 
   const handleWithdraw = async (amount, bank, acct) => {
