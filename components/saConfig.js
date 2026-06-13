@@ -13,9 +13,26 @@ export const db = {
 export const fmt = (n) => `₦${Number(n || 0).toLocaleString()}`;
 export const gc = () => { const c = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; return Array.from({ length: 8 }, () => c[Math.floor(Math.random() * c.length)]).join(''); };
 export const ago = (ts) => { if (!ts) return ''; const d = (Date.now() - new Date(ts)) / 1000; if (d < 60) return 'just now'; if (d < 3600) return `${Math.floor(d / 60)}m ago`; if (d < 86400) return `${Math.floor(d / 3600)}h ago`; return `${Math.floor(d / 86400)}d ago`; };
-export const Ava = ({ s = '', size = '', color = '' }) => (
-  <div className={`ava ${size}`} style={color ? { background: color } : {}}>{s.slice(0, 2).toUpperCase()}</div>
+export const Ava = ({ s = '', size = '', color = '', online = null }) => (
+  <div style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
+    <div className={`ava ${size}`} style={color ? { background: color } : {}}>{s.slice(0, 2).toUpperCase()}</div>
+    {online !== null && (
+      <span style={{
+        position: 'absolute', bottom: -1, right: -1, width: 11, height: 11, borderRadius: '50%',
+        background: online ? '#00ff88' : 'rgba(255,255,255,0.25)',
+        border: '2px solid #07070f',
+        boxShadow: online ? '0 0 6px rgba(0,255,136,0.8)' : 'none',
+        animation: online ? 'pulse 1.6s infinite' : 'none'
+      }} />
+    )}
+  </div>
 );
+
+// Helper: check if user was active in last 2 minutes
+export const isOnline = (lastSeen) => {
+  if (!lastSeen) return false;
+  return (Date.now() - new Date(lastSeen)) < 2 * 60 * 1000;
+};
 export const Badge = ({ type, label }) => (
   <span className={`badge badge-${type}`}>{type === 'live' && <span className="badge-dot" />}{label}</span>
 );
