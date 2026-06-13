@@ -5,6 +5,17 @@ import { Splash, Auth, Dashboard, Challenges, MatchRoomCreate, MatchRoom, Submit
 import { ReferralScreen } from './saReferral';
 import OneSignalInit, { sendNotification } from './OneSignalInit';
 
+// Email helper
+const sendEmail = async (type, to, data) => {
+  try {
+    await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, to, data })
+    });
+  } catch (e) { console.error('Email error:', e); }
+};
+
 function Leaderboard({ token, userId }) {
   const [board, setBoard] = useState([]);
   const [myRank, setMyRank] = useState(null);
@@ -139,7 +150,17 @@ function Admin({ token, showNotif }) {
     } catch (e) { showNotif('Failed', 'err'); }
   };
   const approveWd = async (wd) => {
-    try { await db.patch(`withdrawal_requests?id=eq.${wd.id}`, token, { status: 'approved' }); setWithdrawals(prev => prev.filter(x => x.id !== wd.id)); showNotif('Approved!'); }
+    try {
+      await db.patch(`withdrawal_requests?id=eq.${wd.id}`, token, { status: 'approved' });
+      // Get user email and notify
+      try {
+        const userProf = await db.get(`profiles?id=eq.${wd.user_id}&select=username`, token);
+        await sendEmail('withdrawal_approved', wd.profiles?.email || '', {
+          amount: wd.amount, bankName: wd.bank_name, accountNumber: wd.account_number
+        });
+      } catch(e) {}
+      setWithdrawals(prev => prev.filter(x => x.id !== wd.id)); showNotif('Approved & email sent!');
+    }
     catch (e) { showNotif('Failed', 'err'); }
   };
   const rejectWd = async (wd) => {
@@ -320,6 +341,10 @@ export default function StakeArena() {
       await loadUserData(uid, tok);
       setScreen('dashboard'); setActiveNav('home');
       showNotif(isSignUp ? 'Account created! Welcome 🎉' : 'Welcome back!');
+      // Send welcome email
+      if (isSignUp) {
+        await sendEmail('welcome', em, { username: f?.username || em.split('@')[0] });
+      }
     } catch (e) { showNotif('Connection error. Try again.', 'err'); }
     finally { setLoading(false); }
   };
@@ -372,6 +397,16 @@ export default function StakeArena() {
       // Notify challenge creator
       try {
         await sendNotification([ch.creator_id], '⚔️ Challenge Accepted!', `${profile?.username} joined your challenge! Time to play. Stake: ${fmt(ch.stake_amount)}`, 'https://stakearena-sepia.vercel.app');
+        // Get creator email and send email notification
+        const creatorProfile = await db.get(`profiles?id=eq.${ch.creator_id}&select=id`, token);
+        const creatorAuth = await db.get(`profiles?id=eq.${ch.creator_id}&select=username`, token);
+        if (creatorAuth[0]) {
+          await sendEmail('challenge_accepted', userEmail, {
+            opponentName: profile?.username,
+            stakeAmount: ch.stake_amount,
+            roomCode: ch.room_code
+          });
+        }
       } catch(e) {}
     } catch (e) { showNotif('Failed to join', 'err'); }
     finally { setLoading(false); }
