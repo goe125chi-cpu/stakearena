@@ -377,6 +377,8 @@ export default function StakeArena() {
   const [activeNav, setActiveNav] = useState('home');
   const [notif, setNotif] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
   const isAdmin = profile?.is_admin === true;
   const showNotif = (msg, type = 'success') => { setNotif({ msg, type }); setTimeout(() => setNotif(null), 2800); };
 
@@ -560,6 +562,17 @@ export default function StakeArena() {
                 <div className="hdr-badge">{fmt(wallet?.balance)}</div>
                 <Ava s={profile?.username || '?'} online={true} />
               </div>
+            </div>
+          )}
+          {showInstallBanner && showNav && (
+            <div style={{ position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)', width: 'calc(100% - 32px)', maxWidth: 398, background: 'linear-gradient(135deg,#00ff88,#00ccaa)', borderRadius: 14, padding: '14px 16px', zIndex: 150, display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 8px 24px rgba(0,255,136,0.3)' }}>
+              <span style={{ fontSize: 28 }}>📲</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 15, fontWeight: 800, color: '#07070f' }}>Install StakeArena App</div>
+                <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: 'rgba(7,7,15,0.7)' }}>Get the full app experience</div>
+              </div>
+              <button onClick={handleInstall} style={{ background: '#07070f', color: '#00ff88', border: 'none', borderRadius: 8, padding: '8px 14px', fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>Install</button>
+              <button onClick={dismissInstall} style={{ background: 'none', border: 'none', color: 'rgba(7,7,15,0.5)', fontSize: 18, cursor: 'pointer', padding: 4 }}>✕</button>
             </div>
           )}
           {renderScreen()}
