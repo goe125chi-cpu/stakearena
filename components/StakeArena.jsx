@@ -4,6 +4,10 @@ import { db, fmt, ago, Ava, Badge, Loading, Empty, CSS, initKorapayDeposit, isOn
 import { Splash, Auth, Dashboard, Challenges, MatchRoomCreate, MatchRoom, SubmitResult, Dispute } from './saScreens';
 import { ReferralScreen } from './saReferral';
 import OneSignalInit, { sendNotification } from './OneSignalInit';
+import { Onboarding } from './saOnboarding';
+import { ProfileScreen } from './saProfile';
+import { MatchChat } from './saMatchChat';
+import { TournamentScreen } from './saTournament';
 
 // Email helper
 const sendEmail = async (type, to, data) => {
@@ -444,6 +448,14 @@ export default function StakeArena() {
       setToken(tok); setUserId(uid); setUserEmail(em);
       await loadUserData(uid, tok);
       setScreen('dashboard'); setActiveNav('home');
+      // Claim daily bonus
+      try {
+        const bonusRes = await db.rpc('claim_daily_bonus', tok, { p_user_id: uid });
+        if (bonusRes?.success) {
+          setTimeout(() => showNotif(`🎁 Daily Bonus: +${fmt(bonusRes.bonus)} · ${bonusRes.streak} day streak!`), 1200);
+          loadUserData(uid, tok);
+        }
+      } catch(e) {}
       showNotif(isSignUp ? 'Account created! Welcome 🎉' : 'Welcome back!');
       // Send welcome email
       if (isSignUp) {
@@ -518,13 +530,15 @@ export default function StakeArena() {
   const navItems = [
     { id: 'home', icon: '🏠', label: 'Home' },
     { id: 'challenges', icon: '⚔️', label: 'Challenges' },
+    { id: 'tournaments', icon: '🏅', label: 'Tourneys' },
     { id: 'leaderboard', icon: '🏆', label: 'Rankings' },
     { id: 'wallet', icon: '💳', label: 'Wallet' },
+    { id: 'profile', icon: '📊', label: 'Stats' },
     { id: 'referral', icon: '👥', label: 'Refer' },
     ...(isAdmin ? [{ id: 'admin', icon: '🛡️', label: 'Admin' }] : []),
   ];
 
-  const showNav = token && !['splash', 'auth'].includes(screen);
+  const showNav = token && !['splash', 'auth', 'onboarding'].includes(screen);
   const shared = { token, userId, profile, wallet, transactions, activeMatch, setScreen, setActiveMatch, showNotif };
 
   const renderScreen = () => {
@@ -535,12 +549,23 @@ export default function StakeArena() {
       case 'challenges': return <Challenges {...shared} onJoin={handleJoinChallenge} />;
       case 'create': return <Challenges {...shared} onJoin={handleJoinChallenge} />;
       case 'match-room-create': return <MatchRoomCreate {...shared} />;
-      case 'match-room': return <MatchRoom {...shared} />;
+      case 'match-room': return (
+        <>
+          <MatchRoom {...shared} />
+          {activeMatch?.id && (
+            <MatchChat token={token} userId={userId} matchId={activeMatch.id}
+              opponentName={userId === activeMatch.creator_id ? (activeMatch.opponent_username || 'Opponent') : (activeMatch.creator_username || 'Creator')} />
+          )}
+        </>
+      );
       case 'submit-result': return <SubmitResult {...shared} onSubmit={() => loadUserData(userId, token)} />;
       case 'dispute': return <Dispute {...shared} />;
       case 'leaderboard': return <Leaderboard token={token} userId={userId} />;
       case 'wallet': return <Wallet {...shared} onDeposit={handleDeposit} onWithdraw={handleWithdraw} />;
       case 'referral': return <ReferralScreen token={token} userId={userId} profile={profile} wallet={wallet} showNotif={showNotif} />;
+      case 'onboarding': return <Onboarding onFinish={finishOnboarding} />;
+      case 'profile': return <ProfileScreen token={token} userId={userId} profile={profile} wallet={wallet} />;
+      case 'tournaments': return <TournamentScreen token={token} userId={userId} wallet={wallet} profile={profile} showNotif={showNotif} setScreen={setScreen} isAdmin={isAdmin} />;
       case 'admin': return <Admin token={token} showNotif={showNotif} />;
       default: return <Dashboard {...shared} onNav={nav} />;
     }
