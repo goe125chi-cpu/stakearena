@@ -58,7 +58,6 @@ function Leaderboard({ token, userId }) {
 }
 
 const BANK_ACCOUNTS = [
-  { bankName: 'Opay', accountNumber: '6112501274', accountName: 'Joseph Chibunna Amadi' },
   { bankName: 'Moniepoint MFB', accountNumber: '9115910830', accountName: 'Joseph Chibunna Amadi' },
 ];
 
