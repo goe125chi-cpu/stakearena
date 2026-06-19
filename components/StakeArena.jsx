@@ -470,6 +470,17 @@ export default function StakeArena() {
     if (to === 'home') loadUserData(userId, token);
   };
 
+  const handleLogout = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('sa_session');
+      localStorage.removeItem('sa_onboarded');
+    }
+    setToken(null); setUserId(null); setUserEmail(null);
+    setProfile(null); setWallet(null); setTransactions([]);
+    setActiveMatch(null); setScreen('auth');
+    showNotif('Logged out successfully');
+  };
+
   const handleDeposit = async (amount, reference) => {
     setLoading(true);
     try {
@@ -585,6 +596,9 @@ export default function StakeArena() {
               <div className="hdr-right">
                 <div className="hdr-badge">{fmt(wallet?.balance)}</div>
                 <Ava s={profile?.username || '?'} online={true} />
+                <button onClick={handleLogout} style={{ background: 'rgba(255,45,85,0.12)', border: '1px solid rgba(255,45,85,0.25)', borderRadius: 8, padding: '6px 10px', color: '#ff2d55', fontSize: 11, fontFamily: "'IBM Plex Mono',monospace", cursor: 'pointer', letterSpacing: 0.5 }}>
+                  Exit
+                </button>
               </div>
             </div>
           )}
